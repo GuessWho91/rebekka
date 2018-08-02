@@ -9,60 +9,60 @@
 import Foundation
 
 /** The base class for stream operations. */
-internal class StreamOperation: Operation, NSStreamDelegate {
+internal class StreamOperation: FTPOperation, StreamDelegate {
     var path: String?
-    internal let queue: dispatch_queue_t
+    internal let queue: DispatchQueue
     
-    private var currentStream: NSStream?
+    private var currentStream: Stream?
     
-    init(configuration: SessionConfiguration, queue: dispatch_queue_t) {
+    init(configuration: SessionConfiguration, queue: DispatchQueue) {
         self.queue = queue
         super.init(configuration: configuration)
     }
     
-    private func configureStream(stream: NSStream) {
-        stream.setProperty(true, forKey: kCFStreamPropertyShouldCloseNativeSocket as String)
-        stream.setProperty(true, forKey: kCFStreamPropertyFTPFetchResourceInfo as String)
-        stream.setProperty(self.configuration.passive, forKey: kCFStreamPropertyFTPUsePassiveMode as String)
-        stream.setProperty(self.configuration.username, forKey: kCFStreamPropertyFTPUserName as String)
-        stream.setProperty(self.configuration.password, forKey: kCFStreamPropertyFTPPassword as String)
+    fileprivate func configureStream(_ stream: Stream) {
+        stream.setProperty(true, forKey: Stream.PropertyKey(rawValue: kCFStreamPropertyShouldCloseNativeSocket as String))
+        stream.setProperty(true, forKey: Stream.PropertyKey(rawValue: kCFStreamPropertyFTPFetchResourceInfo as String))
+        stream.setProperty(self.configuration.passive, forKey: Stream.PropertyKey(rawValue: kCFStreamPropertyFTPUsePassiveMode as String))
+        stream.setProperty(self.configuration.username, forKey: Stream.PropertyKey(rawValue: kCFStreamPropertyFTPUserName as String))
+        stream.setProperty(self.configuration.password, forKey: Stream.PropertyKey(rawValue: kCFStreamPropertyFTPPassword as String))
         stream.delegate = self
     }
     
-    func fullURL() -> NSURL {
+    func fullURL() -> URL {
         if self.path != nil {
-            return self.configuration.URL().URLByAppendingPathComponent(path!)
+            return self.configuration.URL().appendingPathComponent(path!)
         }
         return self.configuration.URL()
     }
     
-    @objc func stream(aStream: NSStream, handleEvent eventCode: NSStreamEvent) {
-        if self.cancelled {
-            self.streamEventError(aStream)
+    @objc func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
+        if self.isCancelled {
+            self.streamEventError(aStream: aStream)
             self.error = NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError, userInfo: nil)
             self.finishOperation()
             return
         }
         
         switch eventCode {
-        case NSStreamEvent.OpenCompleted:
-            self.streamEventOpenComleted(aStream)
-        case NSStreamEvent.HasBytesAvailable:
-            self.streamEventHasBytes(aStream)
-        case NSStreamEvent.HasSpaceAvailable:
-            self.streamEventHasSpace(aStream)
-        case NSStreamEvent.ErrorOccurred:
-            self.streamEventError(aStream)
+        case Stream.Event.openCompleted:
+            let _ = self.streamEventOpenComleted(aStream: aStream)
+        case Stream.Event.hasBytesAvailable:
+            let _ = self.streamEventHasBytes(aStream: aStream)
+        case Stream.Event.hasSpaceAvailable:
+            let _ = self.streamEventHasSpace(aStream: aStream)
+        case Stream.Event.errorOccurred:
+            let _ = self.streamEventError(aStream: aStream)
             self.finishOperation()
-        case NSStreamEvent.EndEncountered:
-            self.streamEventEnd(aStream)
+        case Stream.Event.endEncountered:
+            let _ = self.streamEventEnd(aStream: aStream)
             self.finishOperation()
         default:
             print("Unkonwn NSStreamEvent: \(eventCode)")
         }
     }
     
-    func startOperationWithStream(aStream: NSStream) {
+    func startOperationWithStream(aStream: Stream) {
         self.currentStream = aStream
         self.configureStream(self.currentStream!)
         self.currentStream!.open()
@@ -75,23 +75,23 @@ internal class StreamOperation: Operation, NSStreamDelegate {
         self.state = .Finished
     }
     
-    func streamEventOpenComleted(aStream: NSStream) -> (Bool, NSError?) {
+    func streamEventOpenComleted(aStream: Stream) -> (Bool, NSError?) {
         return (true, nil)
     }
     
-    func streamEventEnd(aStream: NSStream) -> (Bool, NSError?) {
+    func streamEventEnd(aStream: Stream) -> (Bool, NSError?) {
         return (true, nil)
     }
     
-    func streamEventHasBytes(aStream: NSStream) -> (Bool, NSError?) {
+    func streamEventHasBytes(aStream: Stream) -> (Bool, NSError?) {
         return (true, nil)
     }
     
-    func streamEventHasSpace(aStream: NSStream) -> (Bool, NSError?) {
+    func streamEventHasSpace(aStream: Stream) -> (Bool, NSError?) {
         return (true, nil)
     }
     
-    func streamEventError(aStream: NSStream) {
-        self.error = aStream.streamError
+    func streamEventError(aStream: Stream) {
+        self.error = aStream.streamError as NSError?
     }
 }
